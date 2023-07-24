@@ -228,7 +228,7 @@ func (g *GoGetter) Get(wd, src, dst string) error {
 		Src:     src,
 		Dst:     dst,
 		Pwd:     wd,
-		Mode:    getter.ClientModeDir,
+		Mode:    getter.ClientModeAny,
 		Options: []getter.ClientOption{},
 	}
 
