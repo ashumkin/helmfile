@@ -58,7 +58,7 @@ func (r *Remote) Locate(urlOrPath string, cacheDirOpt ...string) (string, error)
 	if r.fs.FileExistsAt(urlOrPath) || r.fs.DirectoryExistsAt(urlOrPath) {
 		return urlOrPath, nil
 	}
-	fetched, err := r.Fetch(urlOrPath, cacheDirOpt...)
+	fetched, _, err := r.Fetch(urlOrPath, cacheDirOpt...)
 	if err != nil {
 		if _, ok := err.(InvalidURLError); ok {
 			return urlOrPath, nil
@@ -120,10 +120,10 @@ func Parse(goGetterSrc string) (*Source, error) {
 	}, nil
 }
 
-func (r *Remote) Fetch(goGetterSrc string, cacheDirOpt ...string) (string, error) {
+func (r *Remote) Fetch(goGetterSrc string, cacheDirOpt ...string) (string, bool, error) {
 	u, err := Parse(goGetterSrc)
 	if err != nil {
-		return "", err
+		return "", false, err
 	}
 
 	srcDir := fmt.Sprintf("%s://%s%s", u.Scheme, u.Host, u.Dir)
@@ -141,7 +141,7 @@ func (r *Remote) Fetch(goGetterSrc string, cacheDirOpt ...string) (string, error
 	if len(cacheDirOpt) == 1 {
 		cacheBaseDir = cacheDirOpt[0]
 	} else if len(cacheDirOpt) > 0 {
-		return "", fmt.Errorf("[bug] cacheDirOpt's length: want 0 or 1, got %d", len(cacheDirOpt))
+		return "", false, fmt.Errorf("[bug] cacheDirOpt's length: want 0 or 1, got %d", len(cacheDirOpt))
 	}
 
 	query := u.RawQuery
@@ -149,10 +149,14 @@ func (r *Remote) Fetch(goGetterSrc string, cacheDirOpt ...string) (string, error
 	var cacheKey string
 	replacer := strings.NewReplacer(":", "", "//", "_", "/", "_", ".", "_")
 	dirKey := replacer.Replace(srcDir)
+	var alreadyDecrypted bool
 	if len(query) > 0 {
 		q, _ := neturl.ParseQuery(query)
 		if q.Has("sshkey") {
 			q.Set("sshkey", "redacted")
+		}
+		if q.Has("decrypted") {
+			alreadyDecrypted = strings.ToLower(q.Get("decrypted")) == "true"
 		}
 		paramsKey := strings.ReplaceAll(q.Encode(), "&", "_")
 		cacheKey = fmt.Sprintf("%s.%s", dirKey, paramsKey)
@@ -174,7 +178,7 @@ func (r *Remote) Fetch(goGetterSrc string, cacheDirOpt ...string) (string, error
 
 	{
 		if r.fs.FileExistsAt(cacheDirPath) {
-			return "", fmt.Errorf("%s is not directory. please remove it so that variant could use it for dependency caching", getterDst)
+			return "", false, fmt.Errorf("%s is not directory. please remove it so that variant could use it for dependency caching", getterDst)
 		}
 
 		if r.fs.DirectoryExistsAt(cacheDirPath) {
@@ -203,13 +207,13 @@ func (r *Remote) Fetch(goGetterSrc string, cacheDirOpt ...string) (string, error
 		if err := r.Getter.Get(r.Home, getterSrc, cacheDirPath); err != nil {
 			rmerr := os.RemoveAll(cacheDirPath)
 			if rmerr != nil {
-				return "", multierr.Append(err, rmerr)
+				return "", false, multierr.Append(err, rmerr)
 			}
-			return "", err
+			return "", false, err
 		}
 	}
 
-	return filepath.Join(cacheDirPath, file), nil
+	return filepath.Join(cacheDirPath, file), alreadyDecrypted, nil
 }
 
 type Getter interface {
