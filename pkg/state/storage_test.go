@@ -126,7 +126,7 @@ func TestStorage_resolveFile(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			st := NewStorage(cacheDir, helmexec.NewLogger(io.Discard, "debug"), filesystem.DefaultFileSystem())
 
-			files, skipped, err := st.resolveFile(tt.args.missingFileHandler, tt.args.title, tt.args.path, tt.args.opts...)
+			files, skipped, _, err := st.resolveFile(tt.args.missingFileHandler, tt.args.title, tt.args.path, tt.args.opts...)
 			if (err != nil) != tt.wantErr {
 				t.Errorf("resolveFile() error = %v, wantErr %v", err, tt.wantErr)
 				return

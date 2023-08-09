@@ -42,7 +42,7 @@ func (ld *EnvironmentValuesLoader) LoadEnvironmentValues(missingFileHandler *str
 
 		switch strOrMap := entry.(type) {
 		case string:
-			files, skipped, err := ld.storage.resolveFile(missingFileHandler, "environment values", entry.(string))
+			files, skipped, _, err := ld.storage.resolveFile(missingFileHandler, "environment values", entry.(string))
 			if err != nil {
 				return nil, err
 			}

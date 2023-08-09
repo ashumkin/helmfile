@@ -44,7 +44,7 @@ func ignoreMissingGitBranch(v bool) func(c *resolveFileConfig) {
 	}
 }
 
-func (st *Storage) resolveFile(missingFileHandler *string, tpe, path string, opts ...resolveFileOption) ([]string, bool, error) {
+func (st *Storage) resolveFile(missingFileHandler *string, tpe, path string, opts ...resolveFileOption) ([]string, bool, bool, error) {
 	title := fmt.Sprintf("%s file", tpe)
 
 	var (
@@ -57,16 +57,18 @@ func (st *Storage) resolveFile(missingFileHandler *string, tpe, path string, opt
 		o(&conf)
 	}
 
+	var alreadyDecrypted bool
 	if remote.IsRemote(path) {
 		r := remote.NewRemote(st.logger, "", st.fs)
 
-		fetchedFilePath, err := r.Fetch(path, "values")
+		var fetchedFilePath string
+		fetchedFilePath, alreadyDecrypted, err = r.Fetch(path, "values")
 		if err != nil {
 			// https://github.com/helmfile/helmfile/issues/392
 			if conf.IgnoreMissingGitBranch && strings.Contains(err.Error(), "' did not match any file(s) known to git") {
 				st.logger.Debugf("Ignored missing git branch error: %v", err)
 			} else {
-				return nil, false, err
+				return nil, false, false, err
 			}
 		}
 
@@ -78,7 +80,7 @@ func (st *Storage) resolveFile(missingFileHandler *string, tpe, path string, opt
 	}
 
 	if err != nil {
-		return nil, false, err
+		return nil, false, false, err
 	}
 
 	var handlerId string
@@ -92,16 +94,16 @@ func (st *Storage) resolveFile(missingFileHandler *string, tpe, path string, opt
 	if len(files) == 0 {
 		switch handlerId {
 		case MissingFileHandlerError:
-			return nil, false, fmt.Errorf("%s matching \"%s\" does not exist in \"%s\"", title, path, st.basePath)
+			return nil, false, false, fmt.Errorf("%s matching \"%s\" does not exist in \"%s\"", title, path, st.basePath)
 		case MissingFileHandlerWarn:
 			st.logger.Warnf("skipping missing %s matching \"%s\"", title, path)
-			return nil, true, nil
+			return nil, true, false, nil
 		case MissingFileHandlerInfo:
 			st.logger.Infof("skipping missing %s matching \"%s\"", title, path)
-			return nil, true, nil
+			return nil, true, false, nil
 		case MissingFileHandlerDebug:
 			st.logger.Debugf("skipping missing %s matching \"%s\"", title, path)
-			return nil, true, nil
+			return nil, true, false, nil
 		default:
 			available := []string{
 				MissingFileHandlerError,
@@ -109,11 +111,11 @@ func (st *Storage) resolveFile(missingFileHandler *string, tpe, path string, opt
 				MissingFileHandlerInfo,
 				MissingFileHandlerDebug,
 			}
-			return nil, false, fmt.Errorf("invalid missing file handler \"%s\" while processing \"%s\" in \"%s\": it must be one of %s", handlerId, path, st.FilePath, available)
+			return nil, false, false, fmt.Errorf("invalid missing file handler \"%s\" while processing \"%s\" in \"%s\": it must be one of %s", handlerId, path, st.FilePath, available)
 		}
 	}
 
-	return files, false, nil
+	return files, false, alreadyDecrypted, nil
 }
 
 func (st *Storage) ExpandPaths(globPattern string) ([]string, error) {

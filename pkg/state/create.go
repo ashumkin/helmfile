@@ -234,7 +234,7 @@ func (c *StateCreator) loadEnvValues(st *HelmState, name string, failOnMissingEn
 		if len(envSpec.Secrets) > 0 {
 			var envSecretFiles []string
 			for _, urlOrPath := range envSpec.Secrets {
-				resolved, skipped, err := st.storage().resolveFile(envSpec.MissingFileHandler, "environment values", urlOrPath, envSpec.MissingFileHandlerConfig.resolveFileOptions()...)
+				resolved, skipped, _, err := st.storage().resolveFile(envSpec.MissingFileHandler, "environment values", urlOrPath, envSpec.MissingFileHandlerConfig.resolveFileOptions()...)
 				if err != nil {
 					return nil, err
 				}

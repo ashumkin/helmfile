@@ -358,7 +358,7 @@ func TestRemote_Fetch(t *testing.T) {
 			}
 
 			url := "git::https://github.com/helmfile/helmfile.git@README.md?ref=v0.151.0"
-			file, err := remote.Fetch(url)
+			file, _, err := remote.Fetch(url)
 			if err != nil {
 				t.Fatalf("unexpected error: %v", err)
 			}

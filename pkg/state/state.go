@@ -2842,7 +2842,7 @@ func (st *HelmState) generateTemporaryReleaseValuesFiles(release *ReleaseSpec, v
 	for _, value := range values {
 		switch typedValue := value.(type) {
 		case string:
-			paths, skip, err := st.storage().resolveFile(missingFileHandler, "values", typedValue, st.MissingFileHandlerConfig.resolveFileOptions()...)
+			paths, skip, _, err := st.storage().resolveFile(missingFileHandler, "values", typedValue, st.MissingFileHandlerConfig.resolveFileOptions()...)
 			if err != nil {
 				return generatedFiles, err
 			}
@@ -2936,14 +2936,15 @@ func (st *HelmState) generateSecretValuesFiles(helm helmexec.Interface, release 
 
 	for _, v := range release.Secrets {
 		var (
-			paths []string
-			skip  bool
-			err   error
+			paths            []string
+			skip             bool
+			alreadyDecrypted bool
+			err              error
 		)
 
 		switch value := v.(type) {
 		case string:
-			paths, skip, err = st.storage().resolveFile(release.MissingFileHandler, "secrets", release.ValuesPathPrefix+value, st.MissingFileHandlerConfig.resolveFileOptions()...)
+			paths, skip, alreadyDecrypted, err = st.storage().resolveFile(release.MissingFileHandler, "secrets", release.ValuesPathPrefix+value, st.MissingFileHandlerConfig.resolveFileOptions()...)
 			if err != nil {
 				return nil, err
 			}
@@ -2978,13 +2979,18 @@ func (st *HelmState) generateSecretValuesFiles(helm helmexec.Interface, release 
 		}
 		path := paths[0]
 
-		valfile, err := helm.DecryptSecret(st.createHelmContext(release, workerIndex), path)
-		if err != nil {
-			return nil, err
+		var valfile string
+		if alreadyDecrypted {
+			valfile = path
+		} else {
+			valfile, err = helm.DecryptSecret(st.createHelmContext(release, workerIndex), path)
+			if err != nil {
+				return nil, err
+			}
+			defer func() {
+				_ = os.Remove(valfile)
+			}()
 		}
-		defer func() {
-			_ = os.Remove(valfile)
-		}()
 
 		generatedDecryptedFiles = append(generatedDecryptedFiles, valfile)
 	}
@@ -3412,7 +3418,7 @@ func (st *HelmState) LoadYAMLForEmbedding(release *ReleaseSpec, entries []any, m
 		case string:
 			var values map[string]any
 
-			paths, skip, err := st.storage().resolveFile(missingFileHandler, "values", pathPrefix+t, st.MissingFileHandlerConfig.resolveFileOptions()...)
+			paths, skip, _, err := st.storage().resolveFile(missingFileHandler, "values", pathPrefix+t, st.MissingFileHandlerConfig.resolveFileOptions()...)
 			if err != nil {
 				return nil, err
 			}

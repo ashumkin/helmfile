@@ -93,7 +93,7 @@ func (st *HelmState) goGetterChart(chart, dir, cacheDir string, force bool) (str
 	} else {
 		r := remote.NewRemote(st.logger, "", st.fs)
 
-		fetchedDir, err := r.Fetch(chart, cacheDir)
+		fetchedDir, _, err := r.Fetch(chart, cacheDir)
 		if err != nil {
 			return "", fmt.Errorf("fetching %q: %v", chart, err)
 		}
